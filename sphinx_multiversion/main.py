@@ -245,10 +245,10 @@ def main(argv=None):
             try:
                 git.copy_tree(str(gitroot), gitroot.as_uri(), repopath, gitref)
                 with working_dir(repopath): 
-                    if not os.path.exists(os.path.join(packname, 'ver')):
+                    with open('VERSION', 'w') as ver_f:
+                        ver_f.write(gitref.name)
+                    if gitref.name in legacy_specvers[packname]:
                         os.makedirs(os.path.join(packname, 'ver'))
-                        with open('VERSION', 'w') as ver_f:
-                            ver_f.write(gitref.name)
                         with open(os.path.join(packname, 'ver', '__init__.py'), 'w') as ver_p:
                             ver_p.write(
                                     f'__version__ = "{gitref.name}"\n__specver__ = "{legacy_specvers[packname][gitref.name]}"'
