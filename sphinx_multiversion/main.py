@@ -13,12 +13,24 @@ import subprocess
 import sys
 import tempfile
 
+from distutils.core import run_setup
 from sphinx import config as sphinx_config
 from sphinx import project as sphinx_project
 
 from . import sphinx
 from . import git
 
+legacy_specvers = {
+        'mmif': {
+            "0.2.0": "0.2.1",
+            "0.2.1": "0.2.1",
+            "0.2.2": "0.2.1",
+            "0.3.0": "0.3.0",
+            "0.3.1": "0.3.0",
+            "0.3.2": "0.3.1",
+            "0.3.3": "0.3.1",
+            }
+        }
 
 @contextlib.contextmanager
 def working_dir(path):
@@ -191,6 +203,9 @@ def main(argv=None):
     cwd_absolute = os.path.abspath(".")
     cwd_relative = os.path.relpath(cwd_absolute, str(gitroot))
 
+    if os.path.exists(os.path.join(gitroot, 'mmif')):
+        packname = 'mmif'
+
     logger.debug("Git toplevel path: %s", str(gitroot))
     sourcedir = os.path.relpath(sourcedir_absolute, str(gitroot))
     logger.debug(
@@ -229,6 +244,16 @@ def main(argv=None):
             repopath = os.path.join(tmp, gitref.commit)
             try:
                 git.copy_tree(str(gitroot), gitroot.as_uri(), repopath, gitref)
+                with working_dir(repopath): 
+                    if not os.path.exists(os.path.join(packname, 'ver')):
+                        os.makedirs(os.path.join(packname, 'ver'))
+                        with open('VERSION', 'w') as ver_f:
+                            ver_f.write(gitref.name)
+                        with open(os.path.join(packname, 'ver', '__init__.py'), 'w') as ver_p:
+                            ver_p.write(
+                                    f'__version__ = "{gitref.name}"\n__specver__ = "{legacy_specvers[packname][gitref.name]}"'
+                                    )
+                    run_setup(os.path.join(repopath, 'setup.py'), script_args=['sdist'])
             except (OSError, subprocess.CalledProcessError):
                 logger.error(
                     "Failed to copy git tree for %s to %s",
@@ -274,7 +299,7 @@ def main(argv=None):
             )
             metadata[gitref.name] = {
                 "name": gitref.name,
-                "version": current_config.version,
+                "version": gitref.name,
                 "release": current_config.release,
                 "rst_prolog": current_config.rst_prolog,
                 "is_released": bool(
@@ -320,6 +345,8 @@ def main(argv=None):
             current_argv.extend(
                 [
                     *defines,
+                    "-D",
+                    "version={}".format(version_name),
                     "-D",
                     "smv_current_version={}".format(version_name),
                     "-c",
