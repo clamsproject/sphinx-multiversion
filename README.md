@@ -1,4 +1,10 @@
+
 # sphinx-multiversion [![Build Status](https://travis-ci.org/Holzhaus/sphinx-multiversion.svg?branch=master)](https://travis-ci.org/Holzhaus/sphinx-multiversion)
+
+<hr>
+
+#### Fork of sphinx-multiversion with customization for CLAMS packages
+<hr>
 
 Sphinx extension for building self-hosted versioned docs.
 
