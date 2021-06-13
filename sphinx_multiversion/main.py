@@ -20,17 +20,6 @@ from sphinx import project as sphinx_project
 from . import sphinx
 from . import git
 
-legacy_specvers = {
-        'mmif': {
-            "0.2.0": "0.2.1",
-            "0.2.1": "0.2.1",
-            "0.2.2": "0.2.1",
-            "0.3.0": "0.3.0",
-            "0.3.1": "0.3.0",
-            "0.3.2": "0.3.1",
-            "0.3.3": "0.3.1",
-            }
-        }
 
 @contextlib.contextmanager
 def working_dir(path):
@@ -205,6 +194,17 @@ def main(argv=None):
 
     if os.path.exists(os.path.join(gitroot, 'mmif')):
         packname = 'mmif'
+    tar_vers_f = os.path.join(gitroot, 'documentation', 'target-versions.csv')
+    legacy_specvers = {}
+    if os.path.exists(tar_vers_f):
+        with open(tar_vers_f) as tar_vers:
+            for linenum, line in enumerate(tar_vers):
+                if linenum == 0:
+                    pass
+                mmif_ver, spec_ver = line.split(',')
+                tar_vers_map = legacy_specvers.get(packname, {})
+                tar_vers_map[mmif_ver.replace('"', '')] = spec_ver.replace('"', '')
+                legacy_specvers[packname] = tar_vers_map
 
     logger.debug("Git toplevel path: %s", str(gitroot))
     sourcedir = os.path.relpath(sourcedir_absolute, str(gitroot))
