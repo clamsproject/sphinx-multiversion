@@ -194,6 +194,9 @@ def main(argv=None):
 
     if os.path.exists(os.path.join(gitroot, 'mmif')):
         packname = 'mmif'
+    elif os.path.exists(os.path.join(gitroot, 'clams')):
+        packname = 'clams'
+
     tar_vers_f = os.path.join(gitroot, 'documentation', 'target-versions.csv')
     legacy_specvers = {}
     if os.path.exists(tar_vers_f):
@@ -247,7 +250,7 @@ def main(argv=None):
                 with working_dir(repopath): 
                     with open('VERSION', 'w') as ver_f:
                         ver_f.write(gitref.name)
-                    if gitref.name in legacy_specvers[packname]:
+                    if packname in legacy_specvers and gitref.name in legacy_specvers[packname]:
                         os.makedirs(os.path.join(packname, 'ver'))
                         with open(os.path.join(packname, 'ver', '__init__.py'), 'w') as ver_p:
                             ver_p.write(
