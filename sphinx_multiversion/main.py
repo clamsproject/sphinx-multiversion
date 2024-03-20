@@ -254,8 +254,9 @@ def main(argv=None):
                         os.makedirs(os.path.join(packname, 'ver'))
                         with open(os.path.join(packname, 'ver', '__init__.py'), 'w') as ver_p:
                             ver_p.write(
-                                    f'__version__ = "{gitref.name}"\n__specver__ = "{legacy_specvers[packname][gitref.name]}"'
-                                    )
+                                f'__version__ = "{gitref.name}"\n'
+                                f'__specver__ = "{legacy_specvers[packname][gitref.name].strip()}"'
+                            )
                     run_setup(os.path.join(repopath, 'setup.py'), script_args=['sdist'])
             except (OSError, subprocess.CalledProcessError):
                 logger.error(
