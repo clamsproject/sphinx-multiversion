@@ -8,6 +8,7 @@ import logging
 import os
 import pathlib
 import re
+import shutil
 import string
 import subprocess
 import sys
@@ -19,6 +20,9 @@ from sphinx import project as sphinx_project
 
 from . import sphinx
 from . import git
+
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 
 @contextlib.contextmanager
@@ -121,6 +125,43 @@ def get_python_flags():
             yield from ("-X", "{}={}".format(option, value))
 
 
+def build_mmif_dist(build_dir, gitref, legacy_specvers):
+    """
+    build ``mmif`` distribution (generating all resource files) 
+    and retrospectively fixing old bugs in documentations
+    """
+    packname = 'mmif'
+    # Clone Git repo
+    with (working_dir(build_dir)):
+        with open('VERSION', 'w') as ver_f:
+            ver_f.write(gitref.name)
+        if gitref.name in legacy_specvers:
+            os.makedirs(os.path.join(packname, 'ver'))
+            with open(os.path.join(packname, 'ver', '__init__.py'), 'w') as ver_p:
+                ver_p.write(
+                    f'__version__ = "{gitref.name}"\n'
+                    f'__specver__ = "{legacy_specvers[gitref.name].strip()}"'
+                )
+            if gitref.name.startswith('0.3'):
+                in_fname = 'documentation/autodoc/mmif.vocabulary.rst'
+                with open(in_fname) as in_f, open(os.path.basename(in_fname), 'w') as out_f:
+                    for line in in_f:
+                        if 'media_types' in line:
+                            line = line.replace('media_types', 'document_types')
+                        out_f.write(line)
+                shutil.move(os.path.basename(in_fname), in_fname)
+            with open('documentation/conf.py', 'a') as out_f:
+                out_f.write('sys.path.insert(0, os.path.dirname(os.getenv("SPHINX_MULTIVERSION_SOURCEDIR", default=os.path.dirname(__file__))))')
+            in_fname = 'documentation/modules.rst'
+            with open(in_fname) as in_f, open(os.path.basename(in_fname), 'w') as out_f:
+                for line in in_f:
+                    if 'mmif.vocabulary' in line:
+                        line = line.replace('.. autodoc/', 'autodoc/')
+                    out_f.write(line)
+                shutil.move(os.path.basename(in_fname), in_fname)
+        run_setup('setup.py', script_args=['sdist'])
+
+
 def main(argv=None):
     if not argv:
         argv = sys.argv[1:]
@@ -164,8 +205,6 @@ def main(argv=None):
     args, argv = parser.parse_known_args(argv)
     if args.noconfig:
         return 1
-
-    logger = logging.getLogger(__name__)
 
     sourcedir_absolute = os.path.abspath(args.sourcedir)
     confdir_absolute = (
@@ -236,34 +275,19 @@ def main(argv=None):
     else:
         gitrefs = sorted(gitrefs, key=lambda x: (x.is_remote, *x))
 
-    logger = logging.getLogger(__name__)
-
     with tempfile.TemporaryDirectory() as tmp:
         # Generate Metadata
         metadata = {}
         outputdirs = set()
+        logger.debug([ref.name for ref in gitrefs])
         for gitref in gitrefs:
-            # Clone Git repo
             repopath = os.path.join(tmp, gitref.commit)
             try:
                 git.copy_tree(str(gitroot), gitroot.as_uri(), repopath, gitref)
-                with working_dir(repopath): 
-                    with open('VERSION', 'w') as ver_f:
-                        ver_f.write(gitref.name)
-                    if packname in legacy_specvers and gitref.name in legacy_specvers[packname]:
-                        os.makedirs(os.path.join(packname, 'ver'))
-                        with open(os.path.join(packname, 'ver', '__init__.py'), 'w') as ver_p:
-                            ver_p.write(
-                                f'__version__ = "{gitref.name}"\n'
-                                f'__specver__ = "{legacy_specvers[packname][gitref.name].strip()}"'
-                            )
-                    run_setup(os.path.join(repopath, 'setup.py'), script_args=['sdist'])
+                if packname == 'mmif':
+                    build_mmif_dist(repopath, gitref, legacy_specvers[packname])
             except (OSError, subprocess.CalledProcessError):
-                logger.error(
-                    "Failed to copy git tree for %s to %s",
-                    gitref.refname,
-                    repopath,
-                )
+                logger.error(f"Failed to copy git tree for {gitref.refname} to {tmp}")
                 continue
 
             # Find config
